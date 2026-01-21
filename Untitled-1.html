@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flowers Spelling 'I Like You' Centered with Falling Roses</title>
+    <style>
+        body { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            background: linear-gradient(to bottom, #87CEEB, #98FB98); 
+            margin: 0; 
+            position: relative;
+        }
+        canvas { border: 2px solid #333; }
+        /* Button styling */
+        #startBtn {
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%);
+            padding: 1em 2em; 
+            font-size: 1.2em;
+            cursor: pointer;
+            background: #ff88aa;
+            border: none;
+            border-radius: 10px;
+            color: white;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 🎵 Background Instrumental Music -->
+<audio id="bgMusic" loop preload="auto">
+    <source src="I like you.mp3" type="audio/mpeg">
+</audio>
+
+<!-- Button to start music & animation -->
+<button id="startBtn">Start Music & Flowers</button>
+
+<canvas id="flowerCanvas" width="800" height="600"></canvas>
+
+<script>
+const canvas = document.getElementById('flowerCanvas');
+const ctx = canvas.getContext('2d');
+const bgMusic = document.getElementById("bgMusic");
+const startBtn = document.getElementById("startBtn");
+
+// =========================
+// Animation variables (paused initially)
+let animationStarted = false;
+let currentLetterIndex = 0;
+let animationStep = 0;
+const stepsPerLetter = 120;
+const letterGroups = [];
+const fallingFlowers = [];
+const bigFlowers = []; // NEW: array for big flowers
+let isSpellingDone = false;
+const maxFallingFlowers = 50;
+
+// =========================
+// Letter patterns
+const letterPatterns = {
+    'I': [[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0]],
+    'L': [[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+    'K': [[1,0,0,0,1],[1,0,0,1,0],[1,0,1,0,0],[1,1,0,0,0],[1,0,1,0,0],[1,0,0,1,0],[1,0,0,0,1]],
+    'E': [[1,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+    'Y': [[1,0,0,0,1],[0,1,0,1,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0]],
+    'O': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+    'U': [[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]]
+};
+
+const lines = ["I", "LIKE", "YOU"];
+const letterSpacing = 80;
+const lineHeight = 20;
+const lineSpacing = 160;
+const startY = 50;
+
+// =========================
+// Prepare letter groups (flower positions)
+let yOffset = startY;
+for (let line of lines) {
+    const lineWidth = line.length * (5 * 12) + (line.length - 1) * letterSpacing;
+    let xOffset = (canvas.width - lineWidth) / 2;
+
+    for (let char of line) {
+        const pattern = letterPatterns[char];
+        const letterFlowers = [];
+
+        for (let r = 0; r < pattern.length; r++) {
+            for (let c = 0; c < pattern[r].length; c++) {
+                if (pattern[r][c]) {
+                    letterFlowers.push({
+                        x: xOffset + c * 12,
+                        y: yOffset + r * lineHeight,
+                        petalColor: `hsl(${Math.random() * 360},70%,60%)`,
+                        centerColor: `hsl(${Math.random() * 360},80%,50%)`,
+                        stemProgress: 0,
+                        petalProgress: 0,
+                        centerProgress: 0
+                    });
+                }
+            }
+        }
+        letterGroups.push(letterFlowers);
+        xOffset += letterSpacing;
+    }
+    yOffset += lineSpacing;
+}
+
+// =========================
+// Flower drawing functions
+function drawFlower(f, p) {
+    const { x, y, petalColor, centerColor } = f;
+    f.stemProgress = Math.min(p * 0.3, 1);
+    ctx.strokeStyle = '#228B22';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y + 50 * f.stemProgress);
+    ctx.stroke();
+
+    if (p > 0.3) {
+        f.petalProgress = Math.min((p - 0.3)/0.5, 1);
+        ctx.fillStyle = petalColor;
+        for (let i=0;i<6;i++){
+            const a=i*Math.PI/3;
+            ctx.beginPath();
+            ctx.arc(x+Math.cos(a)*10, y-Math.sin(a)*10, 8*f.petalProgress, 0, Math.PI*2);
+            ctx.fill();
+        }
+    }
+
+    if (p>0.8){
+        f.centerProgress = Math.min((p-0.8)/0.2,1);
+        ctx.fillStyle=centerColor;
+        ctx.beginPath();
+        ctx.arc(x, y, 5*f.centerProgress, 0, Math.PI*2);
+        ctx.fill();
+    }
+}
+
+function drawFallingFlower(f){
+    const {x, y, petalColor, centerColor, size=1} = f; // size optional
+    ctx.strokeStyle='#228B22';
+    ctx.lineWidth=2*size;
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.lineTo(x,y+30*size);
+    ctx.stroke();
+
+    ctx.fillStyle=petalColor;
+    for(let i=0;i<8;i++){
+        const a=i*Math.PI/4;
+        ctx.beginPath();
+        ctx.arc(x+Math.cos(a)*8*size, y-Math.sin(a)*8*size, 6*size,0,Math.PI*2);
+        ctx.fill();
+    }
+
+    ctx.fillStyle=centerColor;
+    ctx.beginPath();
+    ctx.arc(x,y,4*size,0,Math.PI*2);
+    ctx.fill();
+}
+
+// =========================
+// Update falling flowers
+function updateFallingFlowers(){
+    // Small roses
+    if(fallingFlowers.length<maxFallingFlowers && Math.random()<0.1){
+        fallingFlowers.push({
+            x: Math.random()*canvas.width,
+            y:-50,
+            speed:2+Math.random()*3,
+            sway:Math.random()*Math.PI*2,
+            petalColor:'#FF0000',
+            centerColor:'#8B0000',
+            size: 1
+        });
+    }
+
+    fallingFlowers.forEach(f=>{
+        f.y+=f.speed;
+        f.x+=Math.sin(f.sway)*0.5;
+        f.sway+=0.1;
+    });
+
+    for(let i=fallingFlowers.length-1;i>=0;i--){
+        if(fallingFlowers[i].y>canvas.height+50) fallingFlowers.splice(i,1);
+    }
+
+    // Big flowers
+    if(bigFlowers.length<5 && Math.random()<0.01){ 
+        bigFlowers.push({
+            x: Math.random()*canvas.width,
+            y: -80,
+            speed: 1+Math.random()*2,
+            sway: Math.random()*Math.PI*2,
+            petalColor: `hsl(${Math.random()*360},70%,60%)`,
+            centerColor: `hsl(${Math.random()*360},80%,50%)`,
+            size: 2
+        });
+    }
+
+    bigFlowers.forEach(f=>{
+        f.y += f.speed;
+        f.x += Math.sin(f.sway) * 0.3;
+        f.sway += 0.05;
+    });
+
+    for(let i=bigFlowers.length-1;i>=0;i--){
+        if(bigFlowers[i].y>canvas.height+100) bigFlowers.splice(i,1);
+    }
+}
+
+// =========================
+// Animation loop (paused until start)
+function animate(){
+    if(!animationStarted) return; // pause until button click
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    for(let i=0;i<currentLetterIndex;i++){
+        letterGroups[i].forEach(f=>drawFlower(f,1));
+    }
+
+    if(!isSpellingDone){
+        const progress=animationStep/stepsPerLetter;
+        letterGroups[currentLetterIndex]?.forEach(f=>drawFlower(f,progress));
+        animationStep++;
+        if(animationStep>stepsPerLetter){
+            animationStep=0;
+            currentLetterIndex++;
+        }
+        if(currentLetterIndex>=letterGroups.length) isSpellingDone=true;
+    } else {
+        updateFallingFlowers();
+        fallingFlowers.forEach(drawFallingFlower);
+        bigFlowers.forEach(drawFallingFlower); // NEW: draw big flowers
+    }
+
+    requestAnimationFrame(animate);
+}
+
+// =========================
+// Start button click logic
+startBtn.addEventListener("click", ()=>{
+    bgMusic.volume = 0.4;
+    bgMusic.play().catch(err => console.log("Audio blocked:", err));
+    animationStarted = true;
+    startBtn.style.display = "none";
+    animate(); // start animation loop
+});
+
+</script>
+</body>
+</html>
